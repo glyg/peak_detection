@@ -9,6 +9,7 @@ Segré et al. Nature Methods **5**, 8 (2008).[1]_
 
 from __future__ import division
 
+import sys
 import os
 import logging
 import multiprocessing
@@ -21,6 +22,7 @@ from scipy.optimize import leastsq
 from skimage import feature
 
 from tifffile import TiffFile
+from peak_detection import in_ipython
 
 log = logging.getLogger(__name__)
 
@@ -33,15 +35,6 @@ class CanceledByUserException(Exception):
     pass
 
 
-def in_ipython():
-    try:
-        __IPYTHON__
-    except NameError:
-        return False
-    else:
-        return True
-
-
 def detect_peaks(sample, parallel=True, **kwargs):
     """
     Sample can be .tiff file or TiffFile object
@@ -50,8 +43,9 @@ def detect_peaks(sample, parallel=True, **kwargs):
     if isinstance(sample, str):
         sample = TiffFile(sample)
 
-    log.info("Find peaks in %s" % os.path.join(sample.fpath,
-                                               sample.fname))
+    curr_dir = os.path.dirname(__file__)
+    fname = os.path.join(curr_dir, os.path.join(sample.fpath, sample.fname))
+    log.info("Find peaks in %s" % fname)
 
     if not kwargs:
         kwargs = {'w_s': 10,
@@ -62,6 +56,11 @@ def detect_peaks(sample, parallel=True, **kwargs):
 
     stacks = sample.asarray()
     peaks = find_stack_peaks(stacks, parallel=parallel, **kwargs)
+
+    n_stacks = peaks.index.get_level_values('stacks').unique().size
+    n_peaks = peaks.shape[0]
+    log.info('%i peaks detected in %i stacks' % (n_peaks, n_stacks))
+
     return peaks
 
 
@@ -91,10 +90,13 @@ def find_stack_peaks(stacks, parallel=False, **kwargs):
     find_gaussian_peaks for details on the detection method
     """
 
-    # Array shape preprocessing
-    # if fr.ndim == 4:
-    #     test = fr.reshape((-1, ) + fr.shape[-2:])
-    #     test.shape
+    # Array shape preprocessing: work only with 3 dimensions array
+    original_shape = stacks.shape
+    if stacks.ndim == 4:
+        stacks = stacks.reshape((-1, ) + original_shape[-2:])
+        shape_name = ('t', 'z')
+    else:
+        shape_name = ('t',)  # Could be 'z' as well
 
     # Check wether function is run from ipython and disable parallel feature if
     # is the case because python multiprocessing module is not yet compatible
@@ -115,7 +117,7 @@ def find_stack_peaks(stacks, parallel=False, **kwargs):
             signal.signal(signal.SIGINT, signal.SIG_IGN)
 
         ncore = multiprocessing.cpu_count() + 1
-        log.info('Parallel mode enabled: %i cores will be used to process %i frames' %
+        log.info('Parallel mode enabled: %i cores will be used to process %i stacks' %
                  (ncore, nb_stacks))
         pool = multiprocessing.Pool(processes=ncore, initializer=init_worker)
 
@@ -123,10 +125,8 @@ def find_stack_peaks(stacks, parallel=False, **kwargs):
     i = 0
 
     # Build arguments list
-    arguments = itertools.izip(stacks,
-                               itertools.repeat(kwargs),
-                               range(nb_stacks),
-                               itertools.repeat(nb_stacks))
+    arguments = itertools.izip(
+        stacks, itertools.repeat(kwargs), range(nb_stacks))
 
     try:
         # Launch peak_detection
@@ -135,9 +135,12 @@ def find_stack_peaks(stacks, parallel=False, **kwargs):
         else:
             results = itertools.imap(find_gaussian_peaks, arguments)
 
-        # Get unordered results
+        # Get unordered results and log progress
         for i in range(nb_stacks):
-            all_peaks.append(results.next())
+            result = results.next()
+            log.info('Detection done for stack number %i: %i peaks detected (%i/%i - %i%%)' %
+                     (result[0], len(result[1]), i + 1, nb_stacks, ((i + 1) * 100 / nb_stacks)))
+            all_peaks.append(result)
 
     except KeyboardInterrupt:
         pool.terminate()
@@ -146,6 +149,7 @@ def find_stack_peaks(stacks, parallel=False, **kwargs):
             'Peak detection has been canceled by user')
 
     # Sort peaks and remove index used to sort
+    log.info('Reordering stacks')
     all_peaks.sort(key=lambda x: x[0])
     all_peaks = [x[1] for x in all_peaks]
 
@@ -165,6 +169,31 @@ def find_stack_peaks(stacks, parallel=False, **kwargs):
     peaks = pd.DataFrame(peaks, columns=['x', 'y', 'w', 'I'], dtype='float')
     peaks.index = pd.MultiIndex.from_tuples(index, names=['stacks', 'id'])
 
+    # Reshape DataFrame to fit with original_shape
+    # Shape is given in DataFrame columns
+    log.info('Add original shape to DataFrame as columns. Shape = %s' %
+             str(original_shape))
+    n_i = original_shape[0]
+    i_name = shape_name[0]
+    if len(shape_name) == 2:
+        n_j = original_shape[1]
+        j_name = shape_name[1]
+
+    i_col = []
+    j_col = []
+    for (stack_id, label_id), peak in peaks.iterrows():
+        i = stack_id // n_i
+        i_col.append(i)
+
+        if len(shape_name) == 2:
+            j = stack_id % n_j
+            j_col.append(j)
+
+    peaks[i_name] = i_col
+    if len(shape_name) == 2:
+        peaks[j_name] = j_col
+
+    log.info('Detection is done')
     return peaks
 
 
@@ -172,10 +201,7 @@ def find_gaussian_peaks(args):
     """
     Buffer function for _find_gaussian_peaks
     """
-    frame, detection_parameters, i, nb_stacks = args
-    log.info('Processing frame number %i/%i (%i%%)'
-             % (i + 1, nb_stacks, ((i + 1) * 100 / nb_stacks)))
-
+    frame, detection_parameters, i = args
     return (i, _find_gaussian_peaks(frame, **detection_parameters))
 
 
