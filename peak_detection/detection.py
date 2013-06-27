@@ -369,6 +369,7 @@ def hypothesis_map(patch, g_patch, g_squaresum):
     w_s = patch.shape[0]
     # mean = patch.mean()
     multiplicative = g_patch * patch
+
     intensity = multiplicative.sum()
     normalisation = w_s * patch.std()
     ratio = (w_s ** 2 / 2.) * np.log(1 - (intensity
