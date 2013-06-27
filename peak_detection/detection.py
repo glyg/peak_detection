@@ -92,15 +92,16 @@ def find_stack_peaks(stacks, parallel=False, **kwargs):
     """
 
     # Array shape preprocessing
-    if fr.ndim == 4:
-        test = fr.reshape((-1, ) + fr.shape[-2:])
-        test.shape
+    # if fr.ndim == 4:
+    #     test = fr.reshape((-1, ) + fr.shape[-2:])
+    #     test.shape
 
     # Check wether function is run from ipython and disable parallel feature if
     # is the case because python multiprocessing module is not yet compatible
     # with ipython.
     # if in_ipython():
         # parallel = False
+    nb_stacks = len(stacks)
 
     if parallel:
 
@@ -120,7 +121,6 @@ def find_stack_peaks(stacks, parallel=False, **kwargs):
 
     all_peaks = []
     i = 0
-    nb_stacks = len(stacks)
 
     # Build arguments list
     arguments = itertools.izip(stacks,
@@ -144,7 +144,7 @@ def find_stack_peaks(stacks, parallel=False, **kwargs):
         pool.join()
         raise CanceledByUserException(
             'Peak detection has been canceled by user')
-    return
+
     # Sort peaks and remove index used to sort
     all_peaks.sort(key=lambda x: x[0])
     all_peaks = [x[1] for x in all_peaks]
