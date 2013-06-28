@@ -21,7 +21,6 @@ import pandas as pd
 from scipy.optimize import leastsq
 from skimage import feature
 
-from tifffile import TiffFile
 from peak_detection import in_ipython
 
 log = logging.getLogger(__name__)
@@ -35,27 +34,28 @@ class CanceledByUserException(Exception):
     pass
 
 
-def detect_peaks(sample, parallel=True, **kwargs):
+class WrongArrayDimensions(Exception):
+    pass
+
+
+def detect_peaks(array, shape_label=('t', 'z', 'x', 'y'), parallel=True, **detection_parameters):
     """
-    Sample can be .tiff file or TiffFile object
+    Sample must be a numpy array with at least 2 dimensions (x and y)
     """
 
-    if isinstance(sample, str):
-        sample = TiffFile(sample)
+    if array.ndim != len(shape_label):
+        raise WrongArrayDimensions(
+            'Array dimensions must fit with shape_label length arguments')
 
-    curr_dir = os.path.dirname(__file__)
-    fname = os.path.join(curr_dir, os.path.join(sample.fpath, sample.fname))
-    log.info("Find peaks in %s" % fname)
+    if not detection_parameters:
+        detection_parameters = {'w_s': 10,
+                                'peak_radius': 3.,
+                                'threshold': 27.,
+                                'max_peaks': 1e4
+                                }
 
-    if not kwargs:
-        kwargs = {'w_s': 10,
-                  'peak_radius': 3.,
-                  'threshold': 27.,
-                  'max_peaks': 4
-                  }
-
-    stacks = sample.asarray()
-    peaks = find_stack_peaks(stacks, parallel=parallel, **kwargs)
+    peaks = find_stack_peaks(
+        array, shape_label, parallel=parallel, **detection_parameters)
 
     n_stacks = peaks.index.get_level_values('stacks').unique().size
     n_peaks = peaks.shape[0]
@@ -64,7 +64,7 @@ def detect_peaks(sample, parallel=True, **kwargs):
     return peaks
 
 
-def find_stack_peaks(stacks, parallel=False, **kwargs):
+def find_stack_peaks(stacks, shape_label, parallel=False, **detection_parameters):
     """
     Finds the Gaussian peaks for all the pages in a multipage tif.
 
@@ -92,11 +92,11 @@ def find_stack_peaks(stacks, parallel=False, **kwargs):
 
     # Array shape preprocessing: work only with 3 dimensions array
     original_shape = stacks.shape
-    if stacks.ndim == 4:
+    if len(original_shape) == 4:
         stacks = stacks.reshape((-1, ) + original_shape[-2:])
-        shape_name = ('t', 'z')
+        shape_name = shape_label[:2]
     else:
-        shape_name = ('t',)  # Could be 'z' as well
+        shape_name = shape_label[:1]
 
     # Check wether function is run from ipython and disable parallel feature if
     # is the case because python multiprocessing module is not yet compatible
@@ -126,7 +126,7 @@ def find_stack_peaks(stacks, parallel=False, **kwargs):
 
     # Build arguments list
     arguments = itertools.izip(
-        stacks, itertools.repeat(kwargs), range(nb_stacks))
+        stacks, itertools.repeat(detection_parameters), range(nb_stacks))
 
     try:
         # Launch peak_detection
@@ -174,19 +174,19 @@ def find_stack_peaks(stacks, parallel=False, **kwargs):
     log.info('Add original shape to DataFrame as columns. Shape = %s' %
              str(original_shape))
 
-    if len(shape_name) == 2:
+    if len(original_shape) == 4:
         index = list(np.ndindex(original_shape[:2]))
     else:
         index = list(np.ndindex(original_shape[:1]))
 
     stacks_id = peaks.index.get_level_values('stacks')
 
-    i_name = shape_name[0]
+    i_name = shape_label[0]
     i_col = map(lambda x: index[x][0], stacks_id)
     peaks[i_name] = i_col
 
-    if len(shape_name) == 2:
-        j_name = shape_name[1]
+    if len(original_shape) == 4:
+        j_name = shape_label[1]
         j_col = map(lambda x: index[x][1], stacks_id)
         peaks[j_name] = j_col
 
