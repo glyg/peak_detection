@@ -17,32 +17,35 @@ Usage example
 
 ```python
 from peak_detection import detect_peaks
+from tifffile import TiffFile
 
 fname = 'sample.tif'
+
 detection_parameters = {'w_s': 10,
                         'peak_radius': 4.,
                         'threshold': 60.,
                         'max_peaks': 10
                         }
-peaks = detect_peaks(fname, parallel=True, **detection_parameters)
+
+sample = TiffFile(fname)
+peaks = detect_peaks(sample.asarray(), shape_label=('t', 'z', 'x', 'y'), parallel=True, **detection_parameters)
 ```
 
 ```
-2013-06-27 19:53:13:INFO:peak_detection.detection: Find peaks in /home/hadim/Insync/Documents/phd/dev/peak_detection/examples/sample.tif
-2013-06-27 19:53:13:INFO:peak_detection.detection: Parallel mode enabled: 5 cores will be used to process 9 stacks
-2013-06-27 19:53:14:INFO:peak_detection.detection: Detection done for stack number 1: 2 peaks detected (1/9 - 11%)
-2013-06-27 19:53:14:INFO:peak_detection.detection: Detection done for stack number 3: 4 peaks detected (2/9 - 22%)
-2013-06-27 19:53:15:INFO:peak_detection.detection: Detection done for stack number 0: 1 peaks detected (3/9 - 33%)
-2013-06-27 19:53:15:INFO:peak_detection.detection: Detection done for stack number 2: 3 peaks detected (4/9 - 44%)
-2013-06-27 19:53:16:INFO:peak_detection.detection: Detection done for stack number 4: 5 peaks detected (5/9 - 55%)
-2013-06-27 19:53:16:INFO:peak_detection.detection: Detection done for stack number 5: 6 peaks detected (6/9 - 66%)
-2013-06-27 19:53:16:INFO:peak_detection.detection: Detection done for stack number 7: 8 peaks detected (7/9 - 77%)
-2013-06-27 19:53:17:INFO:peak_detection.detection: Detection done for stack number 6: 7 peaks detected (8/9 - 88%)
-2013-06-27 19:53:17:INFO:peak_detection.detection: Detection done for stack number 8: 9 peaks detected (9/9 - 100%)
-2013-06-27 19:53:17:INFO:peak_detection.detection: Reordering stacks
-2013-06-27 19:53:17:INFO:peak_detection.detection: Add original shape to DataFrame as columns. Shape = (3, 3, 54, 209)
-2013-06-27 19:53:17:INFO:peak_detection.detection: Detection is done
-2013-06-27 19:53:17:INFO:peak_detection.detection: 45 peaks detected in 9 stacks
+2013-06-28 19:52:38:INFO:peak_detection.detection: Parallel mode enabled: 5 cores will be used to process 9 stacks
+2013-06-28 19:52:40:INFO:peak_detection.detection: Detection done for stack number 3: 4 peaks detected (1/9 - 11%)
+2013-06-28 19:52:40:INFO:peak_detection.detection: Detection done for stack number 2: 3 peaks detected (2/9 - 22%)
+2013-06-28 19:52:40:INFO:peak_detection.detection: Detection done for stack number 4: 5 peaks detected (3/9 - 33%)
+2013-06-28 19:52:40:INFO:peak_detection.detection: Detection done for stack number 1: 2 peaks detected (4/9 - 44%)
+2013-06-28 19:52:41:INFO:peak_detection.detection: Detection done for stack number 0: 1 peaks detected (5/9 - 55%)
+2013-06-28 19:52:41:INFO:peak_detection.detection: Detection done for stack number 5: 6 peaks detected (6/9 - 66%)
+2013-06-28 19:52:42:INFO:peak_detection.detection: Detection done for stack number 6: 7 peaks detected (7/9 - 77%)
+2013-06-28 19:52:42:INFO:peak_detection.detection: Detection done for stack number 7: 8 peaks detected (8/9 - 88%)
+2013-06-28 19:52:42:INFO:peak_detection.detection: Detection done for stack number 8: 9 peaks detected (9/9 - 100%)
+2013-06-28 19:52:42:INFO:peak_detection.detection: Reordering stacks
+2013-06-28 19:52:42:INFO:peak_detection.detection: Add original shape to DataFrame as columns. Shape = (3, 3, 54, 209)
+2013-06-28 19:52:42:INFO:peak_detection.detection: Detection is done
+2013-06-28 19:52:42:INFO:peak_detection.detection: 45 peaks detected in 9 stacks
 ```
 
 ```python
