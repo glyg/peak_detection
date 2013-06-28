@@ -173,24 +173,21 @@ def find_stack_peaks(stacks, parallel=False, **kwargs):
     # Shape is given in DataFrame columns
     log.info('Add original shape to DataFrame as columns. Shape = %s' %
              str(original_shape))
-    n_i = original_shape[0]
+
+    if len(shape_name) == 2:
+        index = list(np.ndindex(original_shape[:2]))
+    else:
+        index = list(np.ndindex(original_shape[:1]))
+
+    stacks_id = peaks.index.get_level_values('stacks')
+
     i_name = shape_name[0]
-    if len(shape_name) == 2:
-        n_j = original_shape[1]
-        j_name = shape_name[1]
-
-    i_col = []
-    j_col = []
-    for (stack_id, label_id), peak in peaks.iterrows():
-        i = stack_id // n_i
-        i_col.append(i)
-
-        if len(shape_name) == 2:
-            j = stack_id % n_j
-            j_col.append(j)
-
+    i_col = map(lambda x: index[x][0], stacks_id)
     peaks[i_name] = i_col
+
     if len(shape_name) == 2:
+        j_name = shape_name[1]
+        j_col = map(lambda x: index[x][1], stacks_id)
         peaks[j_name] = j_col
 
     log.info('Detection is done')
