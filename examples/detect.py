@@ -13,8 +13,12 @@ detection_parameters = {'w_s': 10,
                         }
 
 sample = TiffFile(fname)
-peaks = detect_peaks(sample.asarray(), shape_label=(
-    't', 'z', 'x', 'y'), parallel=True, **detection_parameters)
+peaks = detect_peaks(sample.asarray(),
+                     shape_label=('t', 'z', 'x', 'y'),
+                     parallel=True,
+                     verbose=True,
+                     show_progress=False,
+                     **detection_parameters)
 
 for id, p in peaks.groupby(level="stacks"):
     print p.shape[0]

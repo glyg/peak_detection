@@ -22,6 +22,7 @@ from scipy.optimize import leastsq
 from skimage import feature
 
 from peak_detection import in_ipython
+from .progress import pprogress
 
 log = logging.getLogger(__name__)
 
@@ -38,7 +39,12 @@ class WrongArrayDimensions(Exception):
     pass
 
 
-def detect_peaks(array, shape_label=('t', 'z', 'x', 'y'), parallel=True, **detection_parameters):
+def detect_peaks(array,
+                 shape_label=('t', 'z', 'x', 'y'),
+                 parallel=True,
+                 show_progress=False,
+                 verbose=True,
+                 **detection_parameters):
     """
     Sample must be a numpy array with at least 2 dimensions (x and y)
     """
@@ -47,6 +53,9 @@ def detect_peaks(array, shape_label=('t', 'z', 'x', 'y'), parallel=True, **detec
         raise WrongArrayDimensions(
             'Array dimensions must fit with shape_label length arguments')
 
+    if not verbose:
+        log.disabled = True
+
     if not detection_parameters:
         detection_parameters = {'w_s': 10,
                                 'peak_radius': 3.,
@@ -54,8 +63,12 @@ def detect_peaks(array, shape_label=('t', 'z', 'x', 'y'), parallel=True, **detec
                                 'max_peaks': 1e4
                                 }
 
-    peaks = find_stack_peaks(
-        array, shape_label, parallel=parallel, **detection_parameters)
+    peaks = find_stack_peaks(array,
+                             shape_label,
+                             parallel=parallel,
+                             verbose=verbose,
+                             show_progress=show_progress,
+                             **detection_parameters)
 
     n_stacks = peaks.index.get_level_values('stacks').unique().size
     n_peaks = peaks.shape[0]
@@ -64,7 +77,12 @@ def detect_peaks(array, shape_label=('t', 'z', 'x', 'y'), parallel=True, **detec
     return peaks
 
 
-def find_stack_peaks(stacks, shape_label, parallel=False, **detection_parameters):
+def find_stack_peaks(stacks,
+                     shape_label,
+                     parallel=False,
+                     verbose=True,
+                     show_progress=False,
+                     **detection_parameters):
     """
     Finds the Gaussian peaks for all the pages in a multipage tif.
 
@@ -138,9 +156,15 @@ def find_stack_peaks(stacks, shape_label, parallel=False, **detection_parameters
         # Get unordered results and log progress
         for i in range(nb_stacks):
             result = results.next()
-            log.info('Detection done for stack number %i: %i peaks detected (%i/%i - %i%%)' %
+            if show_progress:
+                pprogress((i + 1) / nb_stacks * 100, "%i peaks on stack %i" % (len(result[1]), result[0]))
+            elif verbose:
+                log.info('Detection done for stack number %i: %i peaks detected (%i/%i - %i%%)' %
                      (result[0], len(result[1]), i + 1, nb_stacks, ((i + 1) * 100 / nb_stacks)))
             all_peaks.append(result)
+
+        if show_progress:
+            pprogress(-1)
 
     except KeyboardInterrupt:
         pool.terminate()
